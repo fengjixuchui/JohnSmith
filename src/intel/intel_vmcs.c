@@ -178,6 +178,31 @@ IntelSetupVmcs(
     context->CpuidLeaf0Edx = (ULONG)cpuid[3];
 
     /*
+     * Calibrate bare-metal CPUID cost for TSC stealth. Take the minimum
+     * of 200 fenced RDTSC->CPUID->RDTSC samples. This gives the true
+     * hardware cost without scheduling noise. Used by the trap-next-RDTSC
+     * compensation to return a TSC value that hides VM-exit overhead.
+     */
+    {
+        ULONG64 minCost = MAXULONG64;
+        ULONG index;
+        for (index = 0; index < 200; ++index) {
+            unsigned int seed;
+            ULONG64 before = __rdtscp(&seed);
+            __cpuidex(cpuid, 0, 0);
+            unsigned int seed2;
+            ULONG64 after = __rdtscp(&seed2);
+            ULONG64 cost = after - before;
+            if (cost < minCost) {
+                minCost = cost;
+            }
+        }
+        context->TscTrapBareMetalCpuidCost = minCost;
+    }
+    context->TscTrapArmed = 0;
+    context->TscTrapCpuidEntryTsc = 0;
+
+    /*
      * Hypercall clamped return.  The trigger is CPUID leaf 1 with a per-boot
      * subleaf; on the target CPU leaf 1 ignores ECX (verified: every subleaf
      * returns the identical leaf-1 block on bare metal).  The clamped return
@@ -223,7 +248,7 @@ IntelSetupVmcs(
     requiredPrimary = VMX_PRIMARY_ACTIVATE_SECONDARY |
                       VMX_PRIMARY_USE_MSR_BITMAPS |
                       VMX_PRIMARY_USE_TSC_OFFSETTING;
-    desiredPrimary = requiredPrimary | VMX_PRIMARY_RDTSC_EXITING;
+    desiredPrimary = requiredPrimary;
     pinControls = IntelAdjustControls(desiredPin, __readmsr(pinMsr));
     primaryControls = IntelAdjustControls(
         desiredPrimary, primaryCapability);

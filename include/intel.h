@@ -172,6 +172,10 @@ typedef struct _INTEL_CPU_CONTEXT {
     volatile LONG64 RendezvousOwnedEpoch;
     ULONG64 TscOffset;
     volatile LONG64 TscExitDelta;
+    /* TSC stealth: trap-next-RDTSC state (Ophion approach). */
+    volatile LONG TscTrapArmed;
+    ULONG64 TscTrapCpuidEntryTsc;
+    ULONG64 TscTrapBareMetalCpuidCost;
     INTEL_EXIT_RECORD ExitHistory[INTEL_EXIT_HISTORY_COUNT];
 } INTEL_CPU_CONTEXT;
 
@@ -195,6 +199,9 @@ C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, RendezvousJoinGuard) & 3) == 0);
 C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, RendezvousJoinedEpoch) & 7) == 0);
 C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, TscOffset) & 7) == 0);
 C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, TscExitDelta) & 7) == 0);
+C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, TscTrapArmed) & 3) == 0);
+C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, TscTrapCpuidEntryTsc) & 7) == 0);
+C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, TscTrapBareMetalCpuidCost) & 7) == 0);
 
 NTSTATUS
 IntelSetLaunchState(
