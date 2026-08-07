@@ -223,7 +223,7 @@ IntelSetupVmcs(
     requiredPrimary = VMX_PRIMARY_ACTIVATE_SECONDARY |
                       VMX_PRIMARY_USE_MSR_BITMAPS |
                       VMX_PRIMARY_USE_TSC_OFFSETTING;
-    desiredPrimary = requiredPrimary;
+    desiredPrimary = requiredPrimary | VMX_PRIMARY_RDTSC_EXITING;
     pinControls = IntelAdjustControls(desiredPin, __readmsr(pinMsr));
     primaryControls = IntelAdjustControls(
         desiredPrimary, primaryCapability);

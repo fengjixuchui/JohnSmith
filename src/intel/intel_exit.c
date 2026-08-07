@@ -554,12 +554,36 @@ IntelRecordExit(
 }
 #endif
 
+/*
+ * Compute the TSC cost of this VM exit so far and accumulate it into
+ * TscExitDelta.  Called from IntelCompleteVmExit so every exit path
+ * contributes its overhead.  RDTSC/RDTSCP/RDMSR(IA32_TSC) handlers
+ * subtract the accumulated delta from the returned guest-visible TSC so
+ * the guest cannot measure VM-exit cost.  VMCS_TSC_OFFSET is not touched.
+ */
+static VOID
+IntelAccumulateTscExitDelta(
+    _Inout_ INTEL_CPU_CONTEXT* Context
+    )
+{
+    ULONG64 now = __rdtsc();
+    ULONG64 entry = Context->LastExitEntryTsc;
+    LONG64 cost;
+
+    if (now <= entry) {
+        return;
+    }
+    cost = (LONG64)(now - entry);
+    InterlockedExchangeAdd64(&Context->TscExitDelta, cost);
+}
+
 static ULONG
 IntelCompleteVmExit(
     _Inout_ INTEL_CPU_CONTEXT* Context,
     _In_ INTEL_VMEXIT_ACTION Action
     )
 {
+    IntelAccumulateTscExitDelta(Context);
     if (Action == INTEL_VMEXIT_RESUME) {
         if (InterlockedCompareExchange64(
                 &Context->RendezvousOwnedEpoch, 0, 0) != 0) {
@@ -1013,30 +1037,6 @@ IntelHandleHypercall(
         Context, Cpu, VMX_EXIT_CPUID, GuestRip, InstructionLength);
 }
 
-/*
- * Compute the TSC cost of this VM exit so far and accumulate it into
- * TscExitDelta.  Called from timing-sensitive exit handlers (RDTSC,
- * RDTSCP, RDMSR(IA32_TSC)) so the returned guest-visible TSC does not
- * include hypervisor overhead.  The delta is per-CPU and monotonically
- * increasing; it is subtracted from the raw host TSC before the guest
- * sees it.  VMCS_TSC_OFFSET is not touched.
- */
-static VOID
-IntelAccumulateTscExitDelta(
-    _Inout_ INTEL_CPU_CONTEXT* Context
-    )
-{
-    ULONG64 now = __rdtsc();
-    ULONG64 entry = Context->LastExitEntryTsc;
-    LONG64 cost;
-
-    if (now <= entry) {
-        return;
-    }
-    cost = (LONG64)(now - entry);
-    InterlockedExchangeAdd64(&Context->TscExitDelta, cost);
-}
-
 ULONG
 IntelVmExitHandler(
     _Inout_ INTEL_GUEST_REGISTERS* Registers,
@@ -1179,7 +1179,13 @@ IntelVmExitHandler(
         ULONG64 tsc;
         LONG64 exitDelta;
 
+        /* Accumulate exit cost up to this point so the guest-visible TSC
+           includes all prior exit overhead (e.g. a CPUID exit that
+           triggered this RDTSC in the Pafish force-vmexit pattern).
+           Update LastExitEntryTsc so IntelCompleteVmExit only adds the
+           remaining cost after this point. */
         IntelAccumulateTscExitDelta(context);
+        context->LastExitEntryTsc = __rdtsc();
         exitDelta = InterlockedCompareExchange64(&context->TscExitDelta, 0, 0);
 
         if (reason == VMX_EXIT_RDTSCP) {
@@ -1326,6 +1332,7 @@ IntelVmExitHandler(
             LONG64 exitDelta;
 
             IntelAccumulateTscExitDelta(context);
+            context->LastExitEntryTsc = __rdtsc();
             exitDelta = InterlockedCompareExchange64(
                 &context->TscExitDelta, 0, 0);
             msrValue = IntelRendezvousGuestTsc(context, __rdtsc());
