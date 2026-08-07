@@ -319,6 +319,8 @@ IntelSetupVmcs(
     hostFrame->CpuSlatGeneration = &context->SlatGeneration;
     hostFrame->BackendSlatGeneration = &backend->SlatGeneration;
     hostFrame->RendezvousPhase = &backend->Rendezvous.Phase;
+    hostFrame->TscExitDelta = &context->TscExitDelta;
+    InterlockedExchange64(&context->TscExitDelta, 0);
     hostFrame->CpuidLeaf0Eax = context->CpuidLeaf0Eax;
     hostFrame->CpuidLeaf0Ebx = context->CpuidLeaf0Ebx;
     hostFrame->CpuidLeaf0Ecx = context->CpuidLeaf0Ecx;

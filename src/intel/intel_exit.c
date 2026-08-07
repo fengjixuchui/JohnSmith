@@ -1013,6 +1013,30 @@ IntelHandleHypercall(
         Context, Cpu, VMX_EXIT_CPUID, GuestRip, InstructionLength);
 }
 
+/*
+ * Compute the TSC cost of this VM exit so far and accumulate it into
+ * TscExitDelta.  Called from timing-sensitive exit handlers (RDTSC,
+ * RDTSCP, RDMSR(IA32_TSC)) so the returned guest-visible TSC does not
+ * include hypervisor overhead.  The delta is per-CPU and monotonically
+ * increasing; it is subtracted from the raw host TSC before the guest
+ * sees it.  VMCS_TSC_OFFSET is not touched.
+ */
+static VOID
+IntelAccumulateTscExitDelta(
+    _Inout_ INTEL_CPU_CONTEXT* Context
+    )
+{
+    ULONG64 now = __rdtsc();
+    ULONG64 entry = Context->LastExitEntryTsc;
+    LONG64 cost;
+
+    if (now <= entry) {
+        return;
+    }
+    cost = (LONG64)(now - entry);
+    InterlockedExchangeAdd64(&Context->TscExitDelta, cost);
+}
+
 ULONG
 IntelVmExitHandler(
     _Inout_ INTEL_GUEST_REGISTERS* Registers,
@@ -1035,9 +1059,7 @@ IntelVmExitHandler(
             MAXULONG, 0, 0);
     }
     context = (INTEL_CPU_CONTEXT*)Cpu->VendorContext;
-#if JOHNSMITH_DIAGNOSTICS
     context->LastExitEntryTsc = __rdtsc();
-#endif
     if (__vmx_vmread(VMCS_EXIT_REASON, &value) != 0) {
         KeBugCheckEx(HYPERVISOR_ERROR, INTEL_BUGCHECK_UNEXPECTED_EXIT,
             MAXULONG, 1, 0);
@@ -1155,6 +1177,10 @@ IntelVmExitHandler(
 
     if (reason == VMX_EXIT_RDTSC || reason == VMX_EXIT_RDTSCP) {
         ULONG64 tsc;
+        LONG64 exitDelta;
+
+        IntelAccumulateTscExitDelta(context);
+        exitDelta = InterlockedCompareExchange64(&context->TscExitDelta, 0, 0);
 
         if (reason == VMX_EXIT_RDTSCP) {
             unsigned int aux;
@@ -1162,6 +1188,18 @@ IntelVmExitHandler(
             Registers->Rcx = aux;
         } else {
             tsc = IntelRendezvousGuestTsc(context, __rdtsc());
+        }
+        /*
+         * Subtract accumulated exit overhead only when the guest TSC is
+         * live (not frozen by a rendezvous).  During a frozen interval
+         * IntelRendezvousGuestTsc returns a fixed snapshot; subtracting
+         * exit cost from it could move the value backward across calls.
+         */
+        if (exitDelta > 0 && tsc > (ULONG64)exitDelta &&
+            (InterlockedCompareExchange64(
+                &context->RendezvousOwnedEpoch, 0, 0) == 0 ||
+             context->TscOffset == 0)) {
+            tsc -= (ULONG64)exitDelta;
         }
         Registers->Rax = (ULONG)tsc;
         Registers->Rdx = (ULONG)(tsc >> 32);
@@ -1285,7 +1323,18 @@ IntelVmExitHandler(
         ULONG64 msrValue;
 
         if (msr == IA32_TIME_STAMP_COUNTER) {
+            LONG64 exitDelta;
+
+            IntelAccumulateTscExitDelta(context);
+            exitDelta = InterlockedCompareExchange64(
+                &context->TscExitDelta, 0, 0);
             msrValue = IntelRendezvousGuestTsc(context, __rdtsc());
+            if (exitDelta > 0 && msrValue > (ULONG64)exitDelta &&
+                (InterlockedCompareExchange64(
+                    &context->RendezvousOwnedEpoch, 0, 0) == 0 ||
+                 context->TscOffset == 0)) {
+                msrValue -= (ULONG64)exitDelta;
+            }
             Registers->Rax = (ULONG)msrValue;
             Registers->Rdx = (ULONG)(msrValue >> 32);
             IntelAdvanceGuestRip(

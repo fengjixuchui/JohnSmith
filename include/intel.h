@@ -47,7 +47,7 @@ typedef struct _INTEL_HOST_STACK_FRAME {
     ULONG CpuidLeaf0Edx;
     ULONG64 FastPathEnabled;
     volatile LONG* RendezvousPhase;
-    ULONG64 Reserved;
+    volatile LONG64* TscExitDelta;
 } INTEL_HOST_STACK_FRAME;
 
 typedef struct _INTEL_EXIT_RECORD {
@@ -171,6 +171,7 @@ typedef struct _INTEL_CPU_CONTEXT {
     volatile LONG64 RendezvousConsumedNmiEpoch;
     volatile LONG64 RendezvousOwnedEpoch;
     ULONG64 TscOffset;
+    volatile LONG64 TscExitDelta;
     INTEL_EXIT_RECORD ExitHistory[INTEL_EXIT_HISTORY_COUNT];
 } INTEL_CPU_CONTEXT;
 
@@ -182,6 +183,7 @@ C_ASSERT(FIELD_OFFSET(INTEL_HOST_STACK_FRAME, BackendSlatGeneration) == 16);
 C_ASSERT(FIELD_OFFSET(INTEL_HOST_STACK_FRAME, CpuidLeaf0Eax) == 24);
 C_ASSERT(FIELD_OFFSET(INTEL_HOST_STACK_FRAME, FastPathEnabled) == 40);
 C_ASSERT(FIELD_OFFSET(INTEL_HOST_STACK_FRAME, RendezvousPhase) == 48);
+C_ASSERT(FIELD_OFFSET(INTEL_HOST_STACK_FRAME, TscExitDelta) == 56);
 C_ASSERT(FIELD_OFFSET(INTEL_CPU_CONTEXT, ResumeRsp) == 56);
 C_ASSERT(FIELD_OFFSET(INTEL_CPU_CONTEXT, ResumeRip) == 64);
 C_ASSERT(FIELD_OFFSET(INTEL_CPU_CONTEXT, GuestCr2) == 72);
@@ -192,6 +194,7 @@ C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, CompletedExitSequence) & 7) == 0);
 C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, RendezvousJoinGuard) & 3) == 0);
 C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, RendezvousJoinedEpoch) & 7) == 0);
 C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, TscOffset) & 7) == 0);
+C_ASSERT((FIELD_OFFSET(INTEL_CPU_CONTEXT, TscExitDelta) & 7) == 0);
 
 NTSTATUS
 IntelSetLaunchState(
