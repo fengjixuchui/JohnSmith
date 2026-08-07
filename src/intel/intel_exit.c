@@ -1195,16 +1195,7 @@ IntelVmExitHandler(
         } else {
             tsc = IntelRendezvousGuestTsc(context, __rdtsc());
         }
-        /*
-         * Subtract accumulated exit overhead only when the guest TSC is
-         * live (not frozen by a rendezvous).  During a frozen interval
-         * IntelRendezvousGuestTsc returns a fixed snapshot; subtracting
-         * exit cost from it could move the value backward across calls.
-         */
-        if (exitDelta > 0 && tsc > (ULONG64)exitDelta &&
-            (InterlockedCompareExchange64(
-                &context->RendezvousOwnedEpoch, 0, 0) == 0 ||
-             context->TscOffset == 0)) {
+        if (exitDelta > 0 && tsc > (ULONG64)exitDelta) {
             tsc -= (ULONG64)exitDelta;
         }
         Registers->Rax = (ULONG)tsc;
@@ -1336,10 +1327,7 @@ IntelVmExitHandler(
             exitDelta = InterlockedCompareExchange64(
                 &context->TscExitDelta, 0, 0);
             msrValue = IntelRendezvousGuestTsc(context, __rdtsc());
-            if (exitDelta > 0 && msrValue > (ULONG64)exitDelta &&
-                (InterlockedCompareExchange64(
-                    &context->RendezvousOwnedEpoch, 0, 0) == 0 ||
-                 context->TscOffset == 0)) {
+            if (exitDelta > 0 && msrValue > (ULONG64)exitDelta) {
                 msrValue -= (ULONG64)exitDelta;
             }
             Registers->Rax = (ULONG)msrValue;
