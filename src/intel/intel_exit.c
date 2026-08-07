@@ -554,76 +554,12 @@ IntelRecordExit(
 }
 #endif
 
-/*
- * Compute the TSC cost of this VM exit so far and accumulate it into
- * TscExitDelta.  Called from IntelCompleteVmExit so every exit path
- * contributes its overhead.  RDTSC/RDTSCP/RDMSR(IA32_TSC) handlers
- * subtract the accumulated delta from the returned guest-visible TSC so
- * the guest cannot measure VM-exit cost.  VMCS_TSC_OFFSET is not touched.
- */
-static VOID
-IntelAccumulateTscExitDelta(
-    _Inout_ INTEL_CPU_CONTEXT* Context
-    )
-{
-    ULONG64 now = __rdtsc();
-    ULONG64 entry = Context->LastExitEntryTsc;
-    LONG64 cost;
-
-    if (now <= entry) {
-        return;
-    }
-    cost = (LONG64)(now - entry);
-    InterlockedExchangeAdd64(&Context->TscExitDelta, cost);
-}
-
-/*
- * TSC stealth: toggle RDTSC exiting on or off.
- */
-static VOID
-IntelSetRdtscExiting(
-    _Inout_ INTEL_CPU_CONTEXT* Context,
-    _In_ BOOLEAN Enable
-    )
-{
-    ULONG controls = Context->PrimaryControls;
-    ULONG updated = Enable
-        ? (controls | VMX_PRIMARY_RDTSC_EXITING)
-        : (controls & ~VMX_PRIMARY_RDTSC_EXITING);
-
-    if (updated == controls) {
-        return;
-    }
-    if (!NT_SUCCESS(IntelVmWrite(
-            VMCS_PRIMARY_PROCESSOR_CONTROLS, updated))) {
-        KeBugCheckEx(
-            HYPERVISOR_ERROR,
-            INTEL_BUGCHECK_CONTROL_UPDATE,
-            Context->ProcessorIndex,
-            updated,
-            VMX_PRIMARY_RDTSC_EXITING);
-    }
-    Context->PrimaryControls = updated;
-}
-
 static ULONG
 IntelCompleteVmExit(
     _Inout_ INTEL_CPU_CONTEXT* Context,
     _In_ INTEL_VMEXIT_ACTION Action
     )
 {
-    IntelAccumulateTscExitDelta(Context);
-    /*
-     * TSC stealth: disarm the trap-next-RDTSC if this is not the RDTSC
-     * handler itself. The RDTSC handler disarms explicitly before calling
-     * here. For any other exit that fires while the trap is armed, the
-     * Pafish pattern (RDTSC;CPUID;RDTSC) was broken by the intervening
-     * exit, so disarm and disable RDTSC exiting to let RDTSCs pass through.
-     */
-    if (InterlockedCompareExchange(&Context->TscTrapArmed, 0, 0) != 0) {
-        InterlockedExchange(&Context->TscTrapArmed, FALSE);
-        IntelSetRdtscExiting(Context, FALSE);
-    }
     if (Action == INTEL_VMEXIT_RESUME) {
         if (InterlockedCompareExchange64(
                 &Context->RendezvousOwnedEpoch, 0, 0) != 0) {
@@ -1099,7 +1035,9 @@ IntelVmExitHandler(
             MAXULONG, 0, 0);
     }
     context = (INTEL_CPU_CONTEXT*)Cpu->VendorContext;
+#if JOHNSMITH_DIAGNOSTICS
     context->LastExitEntryTsc = __rdtsc();
+#endif
     if (__vmx_vmread(VMCS_EXIT_REASON, &value) != 0) {
         KeBugCheckEx(HYPERVISOR_ERROR, INTEL_BUGCHECK_UNEXPECTED_EXIT,
             MAXULONG, 1, 0);
@@ -1212,58 +1150,18 @@ IntelVmExitHandler(
 
         IntelAdvanceGuestRip(
             context, Cpu, reason, guestRip, instructionLength);
-        /*
-         * TSC stealth: arm the trap for the next RDTSC. The Pafish/EAC
-         * timing attack pattern is RDTSC;CPUID;RDTSC. By arming here we
-         * intercept only the one RDTSC that immediately follows this
-         * CPUID exit, and return a compensated value that hides the
-         * VM-exit overhead. All other RDTSCs pass through at hardware
-         * speed via TSC offsetting.
-         */
-        context->TscTrapCpuidEntryTsc = context->LastExitEntryTsc;
-        InterlockedExchange(&context->TscTrapArmed, TRUE);
-        IntelSetRdtscExiting(context, TRUE);
         return IntelCompleteVmExit(context, INTEL_VMEXIT_RESUME);
     }
 
     if (reason == VMX_EXIT_RDTSC || reason == VMX_EXIT_RDTSCP) {
         ULONG64 tsc;
 
-        if (InterlockedCompareExchange(&context->TscTrapArmed, 0, 0) != 0) {
-            /*
-             * Trap-next-RDTSC path: this RDTSC immediately follows a
-             * CPUID exit. Return a compensated value that hides the
-             * VM-exit overhead. The guest sees:
-             *   cpuid_entry_tsc + bare_metal_cpuid_cost + tsc_offset
-             * which is what it would see on bare metal.
-             */
-            InterlockedExchange(&context->TscTrapArmed, FALSE);
-            IntelSetRdtscExiting(context, FALSE);
-
-            tsc = context->TscTrapCpuidEntryTsc +
-                  context->TscTrapBareMetalCpuidCost +
-                  context->TscOffset;
-
-            if (reason == VMX_EXIT_RDTSCP) {
-                unsigned int aux;
-                (VOID)__rdtscp(&aux);
-                Registers->Rcx = aux;
-            }
+        if (reason == VMX_EXIT_RDTSCP) {
+            unsigned int aux;
+            tsc = IntelRendezvousGuestTsc(context, __rdtscp(&aux));
+            Registers->Rcx = aux;
         } else {
-            /*
-             * Non-trapped RDTSC: RDTSC exiting was enabled by the CPUID
-             * handler but this is not the expected follow-up RDTSC (an
-             * intervening exit disarmed the trap). Return the normal
-             * guest TSC.
-             */
-            IntelSetRdtscExiting(context, FALSE);
-            if (reason == VMX_EXIT_RDTSCP) {
-                unsigned int aux;
-                tsc = IntelRendezvousGuestTsc(context, __rdtscp(&aux));
-                Registers->Rcx = aux;
-            } else {
-                tsc = IntelRendezvousGuestTsc(context, __rdtsc());
-            }
+            tsc = IntelRendezvousGuestTsc(context, __rdtsc());
         }
         Registers->Rax = (ULONG)tsc;
         Registers->Rdx = (ULONG)(tsc >> 32);
@@ -1387,9 +1285,6 @@ IntelVmExitHandler(
         ULONG64 msrValue;
 
         if (msr == IA32_TIME_STAMP_COUNTER) {
-            /* RDMSR(IA32_TSC) does not exit unless the MSR bitmap traps
-               it. Hardware applies VMCS_TSC_OFFSET automatically.
-               This path runs only if the bitmap was configured to trap. */
             msrValue = IntelRendezvousGuestTsc(context, __rdtsc());
             Registers->Rax = (ULONG)msrValue;
             Registers->Rdx = (ULONG)(msrValue >> 32);

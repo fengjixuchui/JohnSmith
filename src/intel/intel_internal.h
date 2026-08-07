@@ -165,7 +165,6 @@
 #define VMX_PRIMARY_USE_MSR_BITMAPS         (1u << 28)
 #define VMX_PRIMARY_INTERRUPT_WINDOW        (1u << 2)
 #define VMX_PRIMARY_USE_TSC_OFFSETTING      (1u << 3)
-#define VMX_PRIMARY_RDTSC_EXITING             (1u << 12)
 #define VMX_PRIMARY_NMI_WINDOW              (1u << 22)
 #define VMX_PIN_NMI_EXITING                  (1u << 3)
 #define VMX_PIN_VIRTUAL_NMIS                 (1u << 5)
