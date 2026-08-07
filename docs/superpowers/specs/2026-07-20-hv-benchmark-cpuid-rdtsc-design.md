@@ -4,13 +4,13 @@
 
 Fold the standalone user-mode CPUID timing experiment into the existing VM-exit benchmark and rename that benchmark target from `vmexit-bench` to `hv-benchmark`.
 
-## Target Rename
+## Target rename
 
-Rename `tools/vmexit-bench` to `tools/hv-benchmark`, including the project file, Visual Studio solution entry, root namespace, intermediate directory, executable target, and documentation references. The output remains under `build\bin\tools`, with the executable named `hv-benchmark.exe`.
+Rename `tools/vmexit-bench` to `tools/hv-benchmark`, including the project file, Visual Studio solution entry, root namespace, intermediate directory, executable target, and documentation references. The output stays under `build\bin\tools`, with the executable named `hv-benchmark.exe`.
 
 Delete the local experimental `build\bin\tools\test.c`. It is a generated build-directory file and is not part of the tracked source tree.
 
-## Timing Measurement
+## Timing measurement
 
 Add a user-mode `MeasureCpuidRdtscTiming` helper to `benchmark.cpp`. It performs:
 
@@ -19,13 +19,13 @@ Add a user-mode `MeasureCpuidRdtscTiming` helper to `benchmark.cpp`. It performs
 3. Integer average calculation for both cumulative totals.
 4. A signed adjusted result: CPUID average minus RDTSC average.
 
-The helper uses MSVC x64 intrinsics. It does not execute `__writecr8`, raise IRQL, or use inline assembly because those operations are unavailable or invalid in a user-mode x64 program. The existing benchmark thread affinity and time-critical priority setup provide the available user-mode scheduling controls.
+The helper uses MSVC x64 intrinsics. It does not execute `__writecr8`, raise IRQL, or use inline assembly, because those operations are unavailable or invalid in a user-mode x64 program. The existing benchmark thread affinity and time-critical priority setup provide the available user-mode scheduling controls.
 
 The unresolved decompiler function `sub_18008DA94` has no project equivalent. Its replacement is the signed adjusted timing result. The benchmark prints the raw CPUID average, raw RDTSC overhead average, and adjusted average before the existing probe table.
 
 No `LFENCE`, extra serialization, artificial jitter, VM callback, driver IOCTL, or new command-line dependency is added. This preserves the requested measurement sequence and keeps the change isolated to the benchmark.
 
-## Existing Probes
+## Existing probes
 
 Keep the existing cross-core software-counter probes unchanged:
 
@@ -34,7 +34,7 @@ Keep the existing cross-core software-counter probes unchanged:
 - `CPUID leaf 16h`
 - Optional `VMCALL floor`
 
-The new RDTSC measurement supplements these probes; it does not replace their statistics or acceptance criteria.
+The new RDTSC measurement supplements these probes. It does not replace their statistics or acceptance criteria.
 
 ## Validation
 
@@ -47,4 +47,4 @@ Add a `--selfcheck` path that verifies the signed average-adjustment calculation
 
 ## Scope
 
-No driver, hypervisor, public API, IOCTL, VMCS control, rendezvous policy, or assembly probe behavior changes. The root `JohnSmith` solution and driver retain their names; only the benchmark project becomes `hv-benchmark`.
+No driver, hypervisor, public API, IOCTL, VMCS control, rendezvous policy, or assembly probe behavior changes. The root `JohnSmith` solution and driver keep their names; only the benchmark project becomes `hv-benchmark`.
