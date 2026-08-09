@@ -2,6 +2,10 @@
 
 Keep changes narrow, architecture-backed, and warning-free.
 
+Follow the repository's [coding style](docs/style/coding.md) and
+[Doxygen style](docs/style/doxygen.md). Format only the source involved in a
+change; do not combine repository-wide formatting with behavioral work.
+
 ## Before review
 
 1. Build Debug, Release, and Benchmark x64.

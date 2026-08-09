@@ -1,8 +1,11 @@
 # AMD SVM/NPT architecture
 
-Implementation map for `src/amd.c`, `src/amd/`, `include/amd.h`, `asm/amd.asm`.
+Implementation map for `src/arch/amd/` and `include/johnsmith/Amd.h`.
 
-Normative source: [AMD64 APM Volume 2, publication 24593 revision 3.44](../../static/docs/24593_3.44_APM_Vol2.pdf).
+Shared stack layouts and register-preservation rules are documented in the
+[assembly ABI contracts](assembly-abi.md).
+
+Normative source: [AMD64 APM Volume 2, publication 24593 revision 3.44](../references/24593_3.44_APM_Vol2.pdf).
 
 ## Platform gates
 
@@ -20,7 +23,12 @@ MSR handling virtualizes EFER, `VM_CR`, and `VM_HSAVE_PA`. EFER writes are gated
 
 `AmdAsmLaunch` saves host state, establishes the host stack, loads guest state, enables GIF, and executes VMRUN. VM exit saves the guest VMCB, restores the host VMCB, preserves GPRs and ABI-volatile XMM registers, and calls the C dispatcher.
 
-The dispatcher consumes pending NPT invalidation, restores `EXITINTINFO`, handles the exact exit code, advances to `nRIP` for completed emulation, and updates VMCB clean bits. Unexpected exits, nested page faults, invalidation failures, and event collisions use separate fail-stop signatures.
+The dispatcher consumes pending NPT invalidation and restores `EXITINTINFO`.
+Focused handlers own CPUID policy, MSR virtualization, and private VMMCALL
+lifecycle operations. Completed emulation advances to `nRIP` through one
+helper that also invalidates the VMCB clean state. Unexpected exits, nested
+page faults, invalidation failures, and event collisions use separate
+fail-stop signatures.
 
 ## NPT and ASIDs
 

@@ -1,0 +1,358 @@
+#include "AmdInternal.h"
+#include "../x86/X86Common.h"
+
+DECLSPEC_NORETURN
+static VOID
+AmdFailEventCollision(
+    _In_ const AMD_VMCB* Vmcb,
+    _In_ const HV_CPU* Cpu,
+    _In_ ULONG64 NewInformation
+    )
+{
+    KeBugCheckEx(
+        HYPERVISOR_ERROR,
+        AMD_BUGCHECK_EVENT_COLLISION,
+        Vmcb == NULL ? MAXULONG :
+            (((ULONG64)(Cpu == NULL ? MAXULONG : Cpu->ProcessorIndex)) << 32) |
+            (Vmcb->Control.ExitCode & MAXULONG),
+        Vmcb == NULL ? NewInformation :
+            ((Vmcb->Control.EventInjection & MAXULONG) << 32) |
+            (NewInformation & MAXULONG),
+        Vmcb == NULL ? 0 : Vmcb->State.Rip);
+}
+
+static VOID
+AmdInjectException(
+    _Inout_ AMD_VMCB* Vmcb,
+    _In_ const HV_CPU* Cpu,
+    _In_ ULONG64 Information,
+    _In_ ULONG ErrorCode
+    )
+{
+    if ((Vmcb->Control.EventInjection & AMD_EVENT_VALID) != 0) {
+        AmdFailEventCollision(Vmcb, Cpu, Information);
+    }
+    Vmcb->Control.EventInjection = Information |
+        ((ULONG64)ErrorCode << 32);
+    Vmcb->Control.VmcbClean = 0;
+}
+
+static VOID
+AmdInjectInvalidOpcode(
+    _Inout_ AMD_VMCB* Vmcb,
+    _In_ const HV_CPU* Cpu
+    )
+{
+    AmdInjectException(Vmcb, Cpu, AMD_EVENT_INJECT_UD, 0);
+}
+
+static BOOLEAN
+AmdIsPrivateHypercall(
+    _In_ const AMD_GUEST_REGISTERS* Registers,
+    _In_ const AMD_VMCB* Vmcb
+    )
+{
+    return Vmcb->State.Cpl == 0 &&
+           Vmcb->State.Rax == HV_HYPERCALL_MAGIC_RAX &&
+           Registers->Rcx == HV_HYPERCALL_MAGIC_RCX &&
+           Registers->Rdx == HV_HYPERCALL_MAGIC_RDX &&
+           Registers->R8 == HV_HYPERCALL_MAGIC_R8;
+}
+
+static VOID
+AmdApplyCpuidPolicy(
+    _In_ ULONG Leaf,
+    _In_ ULONG Subleaf,
+    _Out_writes_(4) int Result[4]
+    )
+{
+    __cpuidex(Result, (int)Leaf, (int)Subleaf);
+
+    if (Leaf == 1) {
+        Result[2] &= (int)~((1u << 31) | (1u << 5));
+        NT_ASSERT((((ULONG)Result[2]) & ((1u << 31) | (1u << 5))) == 0);
+    } else if (Leaf == 0x80000001u) {
+        Result[2] &= (int)~(1u << 2);
+        NT_ASSERT((((ULONG)Result[2]) & (1u << 2)) == 0);
+    } else if (Leaf == 0x8000000Au) {
+        RtlZeroMemory(Result, sizeof(int) * 4);
+    }
+}
+
+static ULONG64
+AmdGetSupportedEferMask(
+    VOID
+    )
+{
+    const ULONG64 baseMask = AMD_EFER_LME | AMD_EFER_LMA | AMD_EFER_SVME;
+    ULONG64 mask = baseMask;
+    ULONG maximumLeaf;
+    int cpuid[4];
+
+    __cpuid(cpuid, 0x80000000);
+    maximumLeaf = (ULONG)cpuid[0];
+    if (maximumLeaf >= 0x80000001u) {
+        __cpuid(cpuid, 0x80000001);
+        if ((((ULONG)cpuid[3]) & (1u << 11)) != 0) {
+            mask |= 1ull << 0;
+        }
+        if ((((ULONG)cpuid[3]) & (1u << 20)) != 0) {
+            mask |= 1ull << 11;
+        }
+        if ((((ULONG)cpuid[3]) & (1u << 25)) != 0) {
+            mask |= 1ull << 14;
+        }
+        if ((((ULONG)cpuid[2]) & (1u << 17)) != 0) {
+            mask |= 1ull << 15;
+        }
+    }
+    if (maximumLeaf >= 0x80000008u) {
+        __cpuid(cpuid, 0x80000008);
+        if ((((ULONG)cpuid[1]) & (1u << 20)) == 0) {
+            mask |= 1ull << 13;
+        }
+        if ((((ULONG)cpuid[1]) & (1u << 8)) != 0) {
+            mask |= 1ull << 17;
+        }
+        if ((((ULONG)cpuid[1]) & (1u << 13)) != 0) {
+            mask |= 1ull << 18;
+        }
+    }
+    if (maximumLeaf >= 0x80000021u) {
+        __cpuid(cpuid, 0x80000021);
+        if ((((ULONG)cpuid[0]) & (1u << 7)) != 0) {
+            mask |= 1ull << 20;
+        }
+        if ((((ULONG)cpuid[0]) & (1u << 8)) != 0) {
+            mask |= 1ull << 21;
+        }
+    }
+    return mask;
+}
+
+static VOID
+AmdAdvanceGuestRip(
+    _Inout_ AMD_VMCB* Vmcb
+    )
+{
+    Vmcb->State.Rip = Vmcb->Control.NextRip;
+    Vmcb->Control.VmcbClean = 0;
+}
+
+static ULONG
+AmdHandleCpuid(
+    _Inout_ AMD_GUEST_REGISTERS* Registers,
+    _Inout_ AMD_VMCB* Vmcb
+    )
+{
+    const ULONG leaf = (ULONG)Vmcb->State.Rax;
+    const ULONG subleaf = (ULONG)Registers->Rcx;
+    int cpuid[4];
+
+    AmdApplyCpuidPolicy(leaf, subleaf, cpuid);
+    Vmcb->State.Rax = (ULONG)cpuid[0];
+    Registers->Rbx = (ULONG)cpuid[1];
+    Registers->Rcx = (ULONG)cpuid[2];
+    Registers->Rdx = (ULONG)cpuid[3];
+    AmdAdvanceGuestRip(Vmcb);
+    return AMD_VMEXIT_RESUME;
+}
+
+static BOOLEAN
+AmdTryReadMsr(
+    _In_ const AMD_CPU_CONTEXT* Context,
+    _In_ ULONG Msr,
+    _Out_ ULONG64* Value
+    )
+{
+    switch (Msr) {
+    case AMD_MSR_EFER:
+        *Value = Context->GuestEfer;
+        return TRUE;
+    case AMD_MSR_VM_CR:
+        *Value = Context->GuestVmCr;
+        return TRUE;
+    case AMD_MSR_VM_HSAVE_PA:
+        *Value = Context->GuestHostSavePhysical;
+        return TRUE;
+    default:
+        return FALSE;
+    }
+}
+
+static BOOLEAN
+AmdTryWriteMsr(
+    _Inout_ AMD_CPU_CONTEXT* Context,
+    _Inout_ AMD_VMCB* Vmcb,
+    _In_ ULONG Msr,
+    _In_ ULONG64 Value
+    )
+{
+    if (Msr == AMD_MSR_EFER) {
+        const ULONG64 validEfer = AmdGetSupportedEferMask();
+
+        NT_ASSERT((validEfer & ~0x000000000036FD01ull) == 0);
+        if ((Value & ~validEfer) != 0 ||
+            (((Value ^ Context->GuestEfer) & (1ull << 8)) != 0 &&
+             (Vmcb->State.Cr0 & (1ull << 31)) != 0)) {
+            return FALSE;
+        }
+        Context->GuestEfer =
+            (Value & ~(1ull << 10)) |
+            (Context->GuestEfer & (1ull << 10));
+        Vmcb->State.Efer = Context->GuestEfer | AMD_EFER_SVME;
+        return TRUE;
+    }
+
+    if (Msr == AMD_MSR_VM_CR) {
+        if ((Value & ~0x1full) != 0) {
+            return FALSE;
+        }
+        if ((Context->GuestVmCr & AMD_VM_CR_LOCK) != 0) {
+            Value = (Value & ~AMD_VM_CR_LOCK_SVMDIS) |
+                    (Context->GuestVmCr & AMD_VM_CR_LOCK_SVMDIS);
+        }
+        Context->GuestVmCr = Value;
+        return TRUE;
+    }
+
+    if (Msr == AMD_MSR_VM_HSAVE_PA) {
+        if ((Value & (PAGE_SIZE - 1)) != 0 ||
+            Value >= HvX86GetPhysicalAddressLimit()) {
+            return FALSE;
+        }
+        Context->GuestHostSavePhysical = Value;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static ULONG
+AmdHandleMsr(
+    _Inout_ AMD_GUEST_REGISTERS* Registers,
+    _In_ const HV_CPU* Cpu,
+    _Inout_ AMD_CPU_CONTEXT* Context,
+    _Inout_ AMD_VMCB* Vmcb
+    )
+{
+    const ULONG msr = (ULONG)Registers->Rcx;
+    const BOOLEAN write = (Vmcb->Control.ExitInfo1 & 1) != 0;
+    ULONG64 value;
+
+    if (!write) {
+        if (!AmdTryReadMsr(Context, msr, &value)) {
+            AmdInjectException(Vmcb, Cpu, AMD_EVENT_INJECT_GP, 0);
+            return AMD_VMEXIT_RESUME;
+        }
+        Vmcb->State.Rax = (ULONG)value;
+        Registers->Rdx = (ULONG)(value >> 32);
+    } else {
+        value = ((ULONG64)(ULONG)Registers->Rdx << 32) |
+                (ULONG)Vmcb->State.Rax;
+        if (!AmdTryWriteMsr(Context, Vmcb, msr, value)) {
+            AmdInjectException(Vmcb, Cpu, AMD_EVENT_INJECT_GP, 0);
+            return AMD_VMEXIT_RESUME;
+        }
+    }
+
+    AmdAdvanceGuestRip(Vmcb);
+    return AMD_VMEXIT_RESUME;
+}
+
+static ULONG
+AmdHandlePrivateHypercall(
+    _In_ const AMD_GUEST_REGISTERS* Registers,
+    _In_ const HV_CPU* Cpu,
+    _Inout_ AMD_CPU_CONTEXT* Context,
+    _Inout_ AMD_VMCB* Vmcb
+    )
+{
+    if (!AmdIsPrivateHypercall(Registers, Vmcb)) {
+        AmdInjectInvalidOpcode(Vmcb, Cpu);
+        return AMD_VMEXIT_RESUME;
+    }
+    if (Registers->R9 == Context->StopCookie) {
+        Context->ResumeRsp = Vmcb->State.Rsp;
+        Context->ResumeRip = Vmcb->Control.NextRip;
+        Context->Virtualized = FALSE;
+        return AMD_VMEXIT_STOP;
+    }
+    if (Registers->R9 == HV_HYPERCALL_SLAT_R9) {
+        AmdAdvanceGuestRip(Vmcb);
+        return AMD_VMEXIT_RESUME;
+    }
+
+    AmdInjectInvalidOpcode(Vmcb, Cpu);
+    return AMD_VMEXIT_RESUME;
+}
+
+ULONG
+AmdVmExitHandler(
+    _Inout_ AMD_GUEST_REGISTERS* Registers,
+    _Inout_ HV_CPU* Cpu
+    )
+{
+    AMD_CPU_CONTEXT* context;
+    AMD_VMCB* vmcb;
+    ULONG64 exitCode;
+
+    if (Registers == NULL || Cpu == NULL || Cpu->VendorContext == NULL) {
+        KeBugCheckEx(HYPERVISOR_ERROR, AMD_BUGCHECK_UNEXPECTED_EXIT,
+            MAXULONG, 0, 0);
+    }
+    context = (AMD_CPU_CONTEXT*)Cpu->VendorContext;
+    vmcb = context->Vmcb;
+    exitCode = vmcb->Control.ExitCode;
+    AmdPrepareTlbControl(context);
+    vmcb->Control.EventInjection =
+        (vmcb->Control.ExitInterruptInfo & AMD_EVENT_VALID) != 0
+        ? vmcb->Control.ExitInterruptInfo : 0;
+
+    if (exitCode == AMD_EXIT_INVALID &&
+        InterlockedCompareExchange(&Cpu->State, 0, 0) ==
+            HV_CPU_STARTING) {
+        context->Virtualized = FALSE;
+        return AMD_VMEXIT_STOP;
+    }
+
+    if (exitCode == AMD_EXIT_CPUID) {
+        return AmdHandleCpuid(Registers, vmcb);
+    }
+
+    if (exitCode == AMD_EXIT_MSR) {
+        return AmdHandleMsr(Registers, Cpu, context, vmcb);
+    }
+
+    if (exitCode == AMD_EXIT_NPF) {
+        KeBugCheckEx(
+            HYPERVISOR_ERROR,
+            AMD_BUGCHECK_NPF,
+            Cpu->ProcessorIndex,
+            (ULONG_PTR)vmcb->Control.ExitInfo1,
+            (ULONG_PTR)vmcb->Control.ExitInfo2);
+    }
+
+    if (exitCode == AMD_EXIT_INVLPGA) {
+        AmdInjectInvalidOpcode(vmcb, Cpu);
+        return AMD_VMEXIT_RESUME;
+    }
+
+    if (exitCode == AMD_EXIT_XSETBV) {
+        AmdInjectException(vmcb, Cpu, AMD_EVENT_INJECT_GP, 0);
+        return AMD_VMEXIT_RESUME;
+    }
+
+    if (exitCode == AMD_EXIT_VMMCALL) {
+        return AmdHandlePrivateHypercall(
+            Registers, Cpu, context, vmcb);
+    }
+
+    if (exitCode >= AMD_EXIT_VMRUN && exitCode <= AMD_EXIT_SKINIT) {
+        AmdInjectInvalidOpcode(vmcb, Cpu);
+        return AMD_VMEXIT_RESUME;
+    }
+
+    KeBugCheckEx(HYPERVISOR_ERROR, AMD_BUGCHECK_UNEXPECTED_EXIT,
+        Cpu->ProcessorIndex, (ULONG_PTR)exitCode, vmcb->State.Rip);
+}

@@ -6,8 +6,8 @@ Verified: **2026-07-19**.
 
 | Source | Revision | Local copy | Used by |
 | --- | --- | --- | --- |
-| Intel 64 and IA-32 SDM, combined volumes | 092, June 2026 | [325462-092](../static/docs/325462-092-sdm-vol-1-2abcd-3abcd-4.pdf) | VMX, VMCS, EPT, VPID, exceptions, MSRs |
-| AMD64 APM Volume 2: System Programming | 24593 rev. 3.44, March 2026 | [24593-3.44](../static/docs/24593_3.44_APM_Vol2.pdf) | SVM, VMCB, NPT, ASIDs, event injection |
+| Intel 64 and IA-32 SDM, combined volumes | 092, June 2026 | [325462-092](references/325462-092-sdm-vol-1-2abcd-3abcd-4.pdf) | VMX, VMCS, EPT, VPID, exceptions, MSRs |
+| AMD64 APM Volume 2: System Programming | 24593 rev. 3.44, March 2026 | [24593-3.44](references/24593_3.44_APM_Vol2.pdf) | SVM, VMCB, NPT, ASIDs, event injection |
 
 Official indexes:
 
@@ -19,8 +19,9 @@ Official indexes:
 
 | Source | Revision | Local copy | Used by |
 | --- | --- | --- | --- |
-| Intel Optimization Reference Manual, Volume 1 | 248966-050, April 2024 | [Intel ORM v050](../static/docs/248966-050-intel-optimization-vol1.pdf) | Cache, TLB, branch, and locality guidance |
+| Intel Optimization Reference Manual, Volume 1 | 248966-050, April 2024 | [Intel ORM v050](references/248966-050-intel-optimization-vol1.pdf) | Cache, TLB, branch, and locality guidance |
 | Microsoft x64 ABI | Current online | [x64 calling convention](https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention?view=msvc-170) | Register volatility, stack alignment, shadow space |
+| Ophion | commit `7b501992bd71af7f5330ec697a1cbe27921157f9` | [GitHub source](https://github.com/zer0condition/Ophion/tree/7b501992bd71af7f5330ec697a1cbe27921157f9) | Trap-next-RDTSC state-machine reference |
 
 ## Local-file integrity
 

@@ -85,7 +85,7 @@
       <AdditionalDependencies>wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <MASM>
-      <IncludePaths>$(ProjectDir)include;%(IncludePaths)</IncludePaths>
+      <IncludePaths>$(ProjectDir)include;$(ProjectDir)src\arch\x86\assembly;%(IncludePaths)</IncludePaths>
       <PreprocessorDefinitions>JOHNSMITH_VMEXIT_BENCHMARK=$(JohnSmithVmexitBenchmark);%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </MASM>
     <DriverSign>
@@ -108,7 +108,7 @@
       <AdditionalDependencies>wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <MASM>
-      <IncludePaths>$(ProjectDir)include;%(IncludePaths)</IncludePaths>
+      <IncludePaths>$(ProjectDir)include;$(ProjectDir)src\arch\x86\assembly;%(IncludePaths)</IncludePaths>
       <PreprocessorDefinitions>JOHNSMITH_VMEXIT_BENCHMARK=$(JohnSmithVmexitBenchmark);%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </MASM>
     <DriverSign>
@@ -131,7 +131,7 @@
       <AdditionalDependencies>wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <MASM>
-      <IncludePaths>$(ProjectDir)include;%(IncludePaths)</IncludePaths>
+      <IncludePaths>$(ProjectDir)include;$(ProjectDir)src\arch\x86\assembly;%(IncludePaths)</IncludePaths>
       <PreprocessorDefinitions>JOHNSMITH_VMEXIT_BENCHMARK=$(JohnSmithVmexitBenchmark);%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </MASM>
     <DriverSign>
@@ -139,55 +139,66 @@
     </DriverSign>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\common\x86_common.c" />
-    <ClCompile Include="src\driver.c" />
-    <ClCompile Include="src\hv.c" />
-    <ClCompile Include="src\log.c" />
-    <ClCompile Include="src\intel.c" />
-    <ClCompile Include="src\intel\intel_exit.c" />
-    <ClCompile Include="src\intel\intel_hypercall.c" />
-    <ClCompile Include="src\intel\intel_hypercall_worker.c" />
-    <ClCompile Include="src\intel\intel_hook.c" />
-    <ClCompile Include="src\intel\intel_rendezvous.c" />
-    <ClCompile Include="src\intel\intel_slat.c" />
-    <ClCompile Include="src\intel\intel_vmcs.c" />
-    <ClCompile Include="src\amd.c" />
-    <ClCompile Include="src\amd\amd_exit.c" />
-    <ClCompile Include="src\amd\amd_slat.c" />
-    <ClCompile Include="src\amd\amd_vmcb.c" />
-    <ClCompile Include="src\hook_observe.c" />
-    <ClCompile Include="src\hook_thunk.c" />
-    <ClCompile Include="src\hook_trampoline.c" />
-    <ClCompile Include="src\introspection.c" />
+    <ClCompile Include="src\core\Driver.c" />
+    <ClCompile Include="src\core\Hypervisor.c" />
+    <ClCompile Include="src\core\Introspection.c" />
+    <ClCompile Include="src\core\Logging.c" />
+    <ClCompile Include="src\core\Registry.c" />
+    <ClCompile Include="src\arch\x86\X86Common.c" />
+    <ClCompile Include="src\arch\intel\IntelBackend.c" />
+    <ClCompile Include="src\arch\intel\IntelExit.c" />
+    <ClCompile Include="src\arch\intel\IntelHook.c" />
+    <ClCompile Include="src\arch\intel\IntelHypercall.c" />
+    <ClCompile Include="src\arch\intel\IntelHypercallWorker.c" />
+    <ClCompile Include="src\arch\intel\IntelRendezvous.c" />
+    <ClCompile Include="src\arch\intel\IntelSlat.c" />
+    <ClCompile Include="src\arch\intel\IntelVmcs.c" />
+    <ClCompile Include="src\arch\amd\AmdBackend.c" />
+    <ClCompile Include="src\arch\amd\AmdExit.c" />
+    <ClCompile Include="src\arch\amd\AmdSlat.c" />
+    <ClCompile Include="src\arch\amd\AmdVmcb.c" />
+    <ClCompile Include="src\hooks\HookObserve.c" />
+    <ClCompile Include="src\hooks\HookThunk.c" />
+    <ClCompile Include="src\hooks\HookTrampoline.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\hv.h" />
-    <ClInclude Include="include\hv_log.h" />
-    <ClInclude Include="src\common\x86_common.h" />
-    <ClInclude Include="include\intel.h" />
-    <ClInclude Include="src\intel\intel_internal.h" />
-    <ClInclude Include="src\intel\intel_rendezvous_policy.h" />
-    <ClInclude Include="include\amd.h" />
-    <ClInclude Include="src\amd\amd_internal.h" />
-    <ClInclude Include="include\hook_observe.h" />
-    <ClInclude Include="include\introspection.h" />
+    <ClInclude Include="include\johnsmith\Amd.h" />
+    <ClInclude Include="include\johnsmith\HookObserve.h" />
+    <ClInclude Include="include\johnsmith\Hypervisor.h" />
+    <ClInclude Include="include\johnsmith\Intel.h" />
+    <ClInclude Include="include\johnsmith\Introspection.h" />
+    <ClInclude Include="include\johnsmith\Logging.h" />
+    <ClInclude Include="src\arch\x86\X86Common.h" />
+    <ClInclude Include="src\arch\intel\IntelInternal.h" />
+    <ClInclude Include="src\arch\intel\IntelHypercall.h" />
+    <ClInclude Include="src\arch\intel\IntelHypercallProtocol.h" />
+    <ClInclude Include="src\arch\intel\IntelRendezvousPolicy.h" />
+    <ClInclude Include="src\arch\intel\IntelTscStealth.h" />
+    <ClInclude Include="src\arch\amd\AmdInternal.h" />
+    <ClInclude Include="src\core\Registry.h" />
+    <ClInclude Include="src\hooks\HookDispatch.h" />
+    <ClInclude Include="src\hooks\HookThunk.h" />
+    <ClInclude Include="src\hooks\HookTrampoline.h" />
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="asm\intel.asm">
-      <ObjectFileName>$(IntDir)intel_asm.obj</ObjectFileName>
+    <MASM Include="src\arch\intel\assembly\Intel.asm">
+      <ObjectFileName>$(IntDir)IntelAssembly.obj</ObjectFileName>
     </MASM>
-    <MASM Include="asm\hook_dispatch.asm">
-      <ObjectFileName>$(IntDir)hook_dispatch.obj</ObjectFileName>
+    <MASM Include="src\hooks\assembly\HookDispatch.asm">
+      <ObjectFileName>$(IntDir)HookDispatch.obj</ObjectFileName>
     </MASM>
-    <MASM Include="asm\amd.asm">
-      <ObjectFileName>$(IntDir)amd_asm.obj</ObjectFileName>
+    <MASM Include="src\arch\amd\assembly\Amd.asm">
+      <ObjectFileName>$(IntDir)AmdAssembly.obj</ObjectFileName>
     </MASM>
-    <MASM Include="asm\hook_probe.asm">
-      <ObjectFileName>$(IntDir)hook_probe.obj</ObjectFileName>
+    <MASM Include="src\hooks\assembly\HookProbe.asm">
+      <ObjectFileName>$(IntDir)HookProbe.obj</ObjectFileName>
     </MASM>
   </ItemGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\arch\x86\assembly\X86Entry.inc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

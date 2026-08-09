@@ -1,8 +1,12 @@
 # Intel VMX/EPT architecture
 
-Implementation map for `src/intel.c`, `src/intel/`, `include/intel.h`, `include/hook_observe.h`, `src/hook_*.c`, `asm/intel.asm`, `asm/hook_dispatch.asm`.
+Implementation map for `src/arch/intel/`, `include/johnsmith/Intel.h`,
+`include/johnsmith/HookObserve.h`, and `src/hooks/`.
 
-Normative source: [Intel SDM combined volumes, version 092](../../static/docs/325462-092-sdm-vol-1-2abcd-3abcd-4.pdf), primarily Volume 3C.
+Shared stack layouts and register-preservation rules are documented in the
+[assembly ABI contracts](assembly-abi.md).
+
+Normative source: [Intel SDM combined volumes, version 092](../references/325462-092-sdm-vol-1-2abcd-3abcd-4.pdf), primarily Volume 3C.
 
 ## Platform gates
 
@@ -26,21 +30,23 @@ The VM-exit path:
 
 Unknown exits and invalid transition states use distinct fail-stop signatures.
 
-## NMI rendezvous and TSC compensation
+## NMI rendezvous and TSC stealth
 
-Timing-sensitive exits use an epoch-counted VMX-root barrier. The owner sends ICR-low `0x000C4400` through xAPIC MMIO offset `0x300` or x2APIC MSR `0x830`. NMI exiting handles targets in VMX non-root mode. A registered Windows NMI callback handles targets already in VMX-root mode.
+Hook-sensitive exits use an epoch-counted VMX-root barrier. The owner sends ICR-low `0x000C4400` through xAPIC MMIO offset `0x300` or x2APIC MSR `0x830`. NMI exiting handles targets in VMX non-root mode. A registered Windows NMI callback handles targets already in VMX-root mode.
 
-EPT violations, intercepted RDTSC/RDTSCP, and intercepted `RDMSR(0x10)` are mandatory rendezvous exits. A matched hook EPT violation reloads the per-CPU budget to eight. Each subsequent non-excluded exit, including CPUID, decrements it. Mandatory exits still rendezvous and consume budget. External interrupts, MTF, and the VMX-preemption timer neither start a rendezvous nor consume budget. CPUID, control-register, other MSR, and GDTR/IDTR/LDTR/TR exits rendezvous only when the budget was nonzero at exit entry.
+EPT violations are mandatory rendezvous exits. A matched hook EPT violation reloads the per-CPU budget to eight. Each subsequent non-excluded exit, including CPUID, decrements it. External interrupts, MTF, the VMX-preemption timer, trap-next-RDTSC/RDTSCP, and intercepted `RDMSR(IA32_TSC)` neither start a rendezvous nor consume the hook budget. CPUID, control-register, other MSR, and GDTR/IDTR/LDTR/TR exits rendezvous only when the budget was nonzero at exit entry.
 
-The compensated interval starts when every participant arrives and ends when owner Finish captures the delta immediately before it publishes `Preparing`. Every participant then prepares before any `VMCS_TSC_OFFSET` write, applies the same delta, and waits for one future resume TSC. Preparation, VMCS apply coordination, the release lead, and final resume overhead stay guest-visible. Acquisition and prepared-count timeouts fail open without compensation. Failures after offset application begins fail stop.
+The rendezvous freezes participants until the owner publishes a common release TSC. It never changes the guest clock. `VMCS_TSC_OFFSET` is written once as zero during VMCS setup and is never modified at runtime. This follows Intel SDM revision 092, Volume 3C §§24.6.5 and 25.3 while avoiding the guest-wide clock drift and driver instability caused by runtime offset changes.
+
+TSC stealth uses a per-vCPU trap-next-timestamp state machine. Backend preparation calibrates the native leaf-0 CPUID cost before any VMXON by taking the minimum of 200 fenced `RDTSC -> CPUID -> RDTSC` samples. RDTSC exiting is capability-checked as toggleable and is off in the initial primary controls. Every per-vCPU MSR bitmap intercepts reads of `IA32_TSC` (`0x10`) while leaving writes native. The leaf-0 assembly micropath records its CPUID timestamp, enables RDTSC exiting, synchronizes the cached primary controls, and publishes the armed state before VMRESUME. Other CPUID leaves use the C handler and arm the same state machine at completion. The next RDTSC, RDTSCP, or `RDMSR(IA32_TSC)` returns `cpuid_entry_tsc + bare_metal_cpuid_cost` when armed, then clears the trap and disables RDTSC exiting. Unarmed reads return the native TSC. RDTSCP returns the current `IA32_TSC_AUX` in RCX. Any other intervening exit clears the trap and disables RDTSC exiting before resume.
 
 While the phase is `Claimed`, the owner drains old per-CPU join guards and outstanding expected-NMI markers, verifies xAPIC ICR readiness when needed, and rechecks that lifecycle is still `RUNNING` before it advances the epoch. It then publishes `Acquiring`, rechecks that the prior markers remain drained, arms new expected-epoch markers, and broadcasts. Because NMI carries no software tag, an unrelated physical NMI can satisfy or coalesce with an armed marker. This first-NMI assumption still requires hardware validation. The xAPIC preflight occurs before marker arming, so a no-send failure cannot leave stale markers.
 
 ## CPUID policy
 
-CPUID exits go through the C handler in Debug, Release, and Benchmark. The policy hides VMX exposure, applies the enabled INVPCID, XSAVES, and RDTSCP masks, and preserves native topology and OS-dependent results. Outside hook proximity, benign CPUID still VM-exits through this path but does not acquire a global rendezvous or broadcast NMIs. Only Benchmark enables the guarded assembly VMCALL fast path.
+Leaf-0 CPUID takes the assembly micropath when the rendezvous is idle and the local SLAT generation is current. That path returns the cached native leaf and arms TSC stealth without entering C. Other CPUID exits use the C handler in Debug, Release, and Benchmark. The policy hides VMX exposure, applies the enabled INVPCID, XSAVES, and RDTSCP masks, and preserves native topology and OS-dependent results. Outside hook proximity, benign CPUID does not acquire a global rendezvous or broadcast NMIs. Only Benchmark enables the separate guarded assembly VMCALL fast path.
 
-This policy adds no artificial jitter, broad CPUID cache, forced `CPUID.80000007H:EDX[8]`, assembly CPUID fast path, new `Draining` phase, or change to NMI, APIC, or timeout behavior.
+This policy adds no artificial jitter, broad CPUID cache, forced `CPUID.80000007H:EDX[8]`, new `Draining` phase, or change to NMI, APIC, or timeout behavior.
 
 ## EPT and VPID
 
@@ -62,16 +68,24 @@ Hook policies live in a fixed slot table and GPA hash. Installation and removal 
 
 ## Control transport
 
-`DriverEntry` reads `Parameters\HypercallSeed`, restricts the service and parameters registry keys to SYSTEM and Administrators, and starts the hypervisor.
+`DriverEntry` owns only driver lifecycle. The private core registry module keeps
+the service path, restricts the service and parameters keys to SYSTEM and
+Administrators, and exposes typed queries to the Intel backend.
 
-The seed derives CPUID subleaves and command identifiers with FNV-1a. A client registers one page on its selected processor. The worker locks that user page with an MDL and services these commands:
+`IntelHypercallProtocol.h` defines the fixed wire tags and FNV-1a arithmetic.
+The seed from `Parameters\HypercallSeed` derives CPUID subleaves and command
+identifiers. A client registers one page on its selected processor. The worker
+locks that user page with an MDL and services these commands:
 
 - register shared page;
 - install, remove, query, and list hooks;
 - read and write memory;
 - invoke the hook probe.
 
-Process-exit notification releases registered pages. Hypervisor teardown stops the worker, drains rundown protection, removes hooks, resets thunk storage, and frees processor EPT views.
+Process-exit notification releases registered pages. The common lifecycle
+starts and stops optional backend services through the backend contract, so it
+does not depend on the Intel worker. Hypervisor teardown drains rundown
+protection, removes hooks, resets thunk storage, and frees processor EPT views.
 
 ## Teardown and diagnostics
 

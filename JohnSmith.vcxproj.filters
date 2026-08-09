@@ -10,63 +10,107 @@
     <Filter Include="Header Files\Private">
       <UniqueIdentifier>{237036DC-C2E9-4FF1-984A-C0C3F7C047D1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Private\x86">
+      <UniqueIdentifier>{7FB9E823-361E-4D4E-927E-1477E9971B15}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Private\Intel">
+      <UniqueIdentifier>{E7C8A681-A425-4332-8099-417E03F485BB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Private\AMD">
+      <UniqueIdentifier>{87CC6602-F1E7-4B12-9072-1256A9796C7E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Private\Core">
+      <UniqueIdentifier>{CC8E6412-2E22-42D3-9B46-D737B0034E6D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Private\Hooks">
+      <UniqueIdentifier>{5766202F-9BA5-459A-9F74-46D0B169223E}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files">
       <UniqueIdentifier>{AB6D16AE-9987-480A-8BC8-1067C8C035AA}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Core">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Common">
+    <Filter Include="Source Files\Architecture">
       <UniqueIdentifier>{871F96C5-A673-4C6D-9B07-40259B865F25}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Intel">
+    <Filter Include="Source Files\Architecture\x86">
+      <UniqueIdentifier>{BC31AAC6-D587-46C7-AEF4-1BB766104F70}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Architecture\Intel">
       <UniqueIdentifier>{5D5AA125-9CC0-4A92-840D-E6A06F8B7825}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\AMD">
+    <Filter Include="Source Files\Architecture\AMD">
       <UniqueIdentifier>{73D287FB-0CEB-4F85-A772-C1944C037AF3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Hooks">
+      <UniqueIdentifier>{FB01F1CA-29EA-4217-A85D-E4EBAD4B5A27}</UniqueIdentifier>
     </Filter>
     <Filter Include="Assembly Files">
       <UniqueIdentifier>{D8BCEBB8-1A65-4C10-8D9B-53B85A1E258E}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Assembly Files\Intel">
+      <UniqueIdentifier>{D81A9B57-B0E3-4E83-8130-0DD14CD015EE}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assembly Files\AMD">
+      <UniqueIdentifier>{03199017-2CF8-4B3E-85E9-BFF97E267BBB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assembly Files\Hooks">
+      <UniqueIdentifier>{C5B8A2C4-B4AD-4439-802D-C916269D7A59}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Assembly Files\Common">
+      <UniqueIdentifier>{63E2AF48-C92A-4F66-B3CC-BD7B278998DD}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\hv.h"><Filter>Header Files\Public</Filter></ClInclude>
-    <ClInclude Include="include\hv_log.h"><Filter>Header Files\Public</Filter></ClInclude>
-    <ClInclude Include="include\intel.h"><Filter>Header Files\Public</Filter></ClInclude>
-    <ClInclude Include="include\amd.h"><Filter>Header Files\Public</Filter></ClInclude>
-    <ClInclude Include="include\introspection.h"><Filter>Header Files\Public</Filter></ClInclude>
-    <ClInclude Include="include\hook_observe.h"><Filter>Header Files\Public</Filter></ClInclude>
-    <ClInclude Include="src\common\x86_common.h"><Filter>Header Files\Private</Filter></ClInclude>
-    <ClInclude Include="src\intel\intel_internal.h"><Filter>Header Files\Private</Filter></ClInclude>
-    <ClInclude Include="src\intel\intel_rendezvous_policy.h"><Filter>Header Files\Private</Filter></ClInclude>
-    <ClInclude Include="src\amd\amd_internal.h"><Filter>Header Files\Private</Filter></ClInclude>
+    <ClInclude Include="include\johnsmith\Amd.h"><Filter>Header Files\Public</Filter></ClInclude>
+    <ClInclude Include="include\johnsmith\HookObserve.h"><Filter>Header Files\Public</Filter></ClInclude>
+    <ClInclude Include="include\johnsmith\Hypervisor.h"><Filter>Header Files\Public</Filter></ClInclude>
+    <ClInclude Include="include\johnsmith\Intel.h"><Filter>Header Files\Public</Filter></ClInclude>
+    <ClInclude Include="include\johnsmith\Introspection.h"><Filter>Header Files\Public</Filter></ClInclude>
+    <ClInclude Include="include\johnsmith\Logging.h"><Filter>Header Files\Public</Filter></ClInclude>
+    <ClInclude Include="src\arch\x86\X86Common.h"><Filter>Header Files\Private\x86</Filter></ClInclude>
+    <ClInclude Include="src\arch\intel\IntelInternal.h"><Filter>Header Files\Private\Intel</Filter></ClInclude>
+    <ClInclude Include="src\arch\intel\IntelHypercall.h"><Filter>Header Files\Private\Intel</Filter></ClInclude>
+    <ClInclude Include="src\arch\intel\IntelHypercallProtocol.h"><Filter>Header Files\Private\Intel</Filter></ClInclude>
+    <ClInclude Include="src\arch\intel\IntelRendezvousPolicy.h"><Filter>Header Files\Private\Intel</Filter></ClInclude>
+    <ClInclude Include="src\arch\intel\IntelTscStealth.h"><Filter>Header Files\Private\Intel</Filter></ClInclude>
+    <ClInclude Include="src\arch\amd\AmdInternal.h"><Filter>Header Files\Private\AMD</Filter></ClInclude>
+    <ClInclude Include="src\core\Registry.h"><Filter>Header Files\Private\Core</Filter></ClInclude>
+    <ClInclude Include="src\hooks\HookDispatch.h"><Filter>Header Files\Private\Hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\HookThunk.h"><Filter>Header Files\Private\Hooks</Filter></ClInclude>
+    <ClInclude Include="src\hooks\HookTrampoline.h"><Filter>Header Files\Private\Hooks</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\driver.c"><Filter>Source Files\Core</Filter></ClCompile>
-    <ClCompile Include="src\hv.c"><Filter>Source Files\Core</Filter></ClCompile>
-    <ClCompile Include="src\log.c"><Filter>Source Files\Core</Filter></ClCompile>
-    <ClCompile Include="src\introspection.c"><Filter>Source Files\Core</Filter></ClCompile>
-    <ClCompile Include="src\hook_observe.c"><Filter>Source Files\Core</Filter></ClCompile>
-    <ClCompile Include="src\hook_thunk.c"><Filter>Source Files\Core</Filter></ClCompile>
-    <ClCompile Include="src\hook_trampoline.c"><Filter>Source Files\Core</Filter></ClCompile>
-    <ClCompile Include="src\common\x86_common.c"><Filter>Source Files\Common</Filter></ClCompile>
-    <ClCompile Include="src\intel.c"><Filter>Source Files\Intel</Filter></ClCompile>
-    <ClCompile Include="src\intel\intel_exit.c"><Filter>Source Files\Intel</Filter></ClCompile>
-    <ClCompile Include="src\intel\intel_hypercall.c"><Filter>Source Files\Intel</Filter></ClCompile>
-    <ClCompile Include="src\intel\intel_hypercall_worker.c"><Filter>Source Files\Intel</Filter></ClCompile>
-    <ClCompile Include="src\intel\intel_hook.c"><Filter>Source Files\Intel</Filter></ClCompile>
-    <ClCompile Include="src\intel\intel_rendezvous.c"><Filter>Source Files\Intel</Filter></ClCompile>
-    <ClCompile Include="src\intel\intel_slat.c"><Filter>Source Files\Intel</Filter></ClCompile>
-    <ClCompile Include="src\intel\intel_vmcs.c"><Filter>Source Files\Intel</Filter></ClCompile>
-    <ClCompile Include="src\amd.c"><Filter>Source Files\AMD</Filter></ClCompile>
-    <ClCompile Include="src\amd\amd_exit.c"><Filter>Source Files\AMD</Filter></ClCompile>
-    <ClCompile Include="src\amd\amd_slat.c"><Filter>Source Files\AMD</Filter></ClCompile>
-    <ClCompile Include="src\amd\amd_vmcb.c"><Filter>Source Files\AMD</Filter></ClCompile>
+    <ClCompile Include="src\core\Driver.c"><Filter>Source Files\Core</Filter></ClCompile>
+    <ClCompile Include="src\core\Hypervisor.c"><Filter>Source Files\Core</Filter></ClCompile>
+    <ClCompile Include="src\core\Introspection.c"><Filter>Source Files\Core</Filter></ClCompile>
+    <ClCompile Include="src\core\Logging.c"><Filter>Source Files\Core</Filter></ClCompile>
+    <ClCompile Include="src\core\Registry.c"><Filter>Source Files\Core</Filter></ClCompile>
+    <ClCompile Include="src\arch\x86\X86Common.c"><Filter>Source Files\Architecture\x86</Filter></ClCompile>
+    <ClCompile Include="src\arch\intel\IntelBackend.c"><Filter>Source Files\Architecture\Intel</Filter></ClCompile>
+    <ClCompile Include="src\arch\intel\IntelExit.c"><Filter>Source Files\Architecture\Intel</Filter></ClCompile>
+    <ClCompile Include="src\arch\intel\IntelHook.c"><Filter>Source Files\Architecture\Intel</Filter></ClCompile>
+    <ClCompile Include="src\arch\intel\IntelHypercall.c"><Filter>Source Files\Architecture\Intel</Filter></ClCompile>
+    <ClCompile Include="src\arch\intel\IntelHypercallWorker.c"><Filter>Source Files\Architecture\Intel</Filter></ClCompile>
+    <ClCompile Include="src\arch\intel\IntelRendezvous.c"><Filter>Source Files\Architecture\Intel</Filter></ClCompile>
+    <ClCompile Include="src\arch\intel\IntelSlat.c"><Filter>Source Files\Architecture\Intel</Filter></ClCompile>
+    <ClCompile Include="src\arch\intel\IntelVmcs.c"><Filter>Source Files\Architecture\Intel</Filter></ClCompile>
+    <ClCompile Include="src\arch\amd\AmdBackend.c"><Filter>Source Files\Architecture\AMD</Filter></ClCompile>
+    <ClCompile Include="src\arch\amd\AmdExit.c"><Filter>Source Files\Architecture\AMD</Filter></ClCompile>
+    <ClCompile Include="src\arch\amd\AmdSlat.c"><Filter>Source Files\Architecture\AMD</Filter></ClCompile>
+    <ClCompile Include="src\arch\amd\AmdVmcb.c"><Filter>Source Files\Architecture\AMD</Filter></ClCompile>
+    <ClCompile Include="src\hooks\HookObserve.c"><Filter>Source Files\Hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\HookThunk.c"><Filter>Source Files\Hooks</Filter></ClCompile>
+    <ClCompile Include="src\hooks\HookTrampoline.c"><Filter>Source Files\Hooks</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="asm\intel.asm"><Filter>Assembly Files</Filter></MASM>
-    <MASM Include="asm\amd.asm"><Filter>Assembly Files</Filter></MASM>
-    <MASM Include="asm\hook_dispatch.asm"><Filter>Assembly Files</Filter></MASM>
-    <MASM Include="asm\hook_probe.asm"><Filter>Assembly Files</Filter></MASM>
+    <MASM Include="src\arch\intel\assembly\Intel.asm"><Filter>Assembly Files\Intel</Filter></MASM>
+    <MASM Include="src\arch\amd\assembly\Amd.asm"><Filter>Assembly Files\AMD</Filter></MASM>
+    <MASM Include="src\hooks\assembly\HookDispatch.asm"><Filter>Assembly Files\Hooks</Filter></MASM>
+    <MASM Include="src\hooks\assembly\HookProbe.asm"><Filter>Assembly Files\Hooks</Filter></MASM>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\arch\x86\assembly\X86Entry.inc"><Filter>Assembly Files\Common</Filter></None>
   </ItemGroup>
 </Project>

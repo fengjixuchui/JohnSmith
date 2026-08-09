@@ -1,5 +1,7 @@
-# Visual Studio
+# Visual Studio and editor state
 .vs/
+.vscode/
+.idea/
 *.suo
 *.user
 *.userosscache
@@ -7,45 +9,60 @@
 *.VC.db
 *.VC.opendb
 
-# MSBuild / WDK output
-build/
+# MSBuild and WDK outputs
+/build/
 [Dd]ebug/
 [Rr]elease/
-x64/
-obj*/
+[Bb]enchmark/
+[Bb]in/
+[Oo]bj/
+Generated Files/
 *.obj
 *.iobj
 *.ipdb
+*.idb
+*.pch
 *.pdb
 *.ilk
+*.exp
+*.lib
 *.tlog
 *.lastbuildstate
 *.recipe
+*.cache
 *.log
+*.tmp
 
-# Driver packages and signing material
+# Driver packages, signing material, and diagnostics
 *.sys
 *.cat
 *.cer
 *.pfx
 *.pvk
 *.snk
+*.dmp
+*.hdmp
+*.etl
 
-# Local agent metadata and bundled reference manuals
+# Local analysis and agent metadata
 .agents/
 .codex/
 .codegraph/
+.freebuff/
+.symbols/
 .worktrees/
+.chunkhound/
+.freebuff/
+.chunkhound.json
 drv64.dll
-static/docs/hyprdbg.2207.05676v2.pdf
 
-# OS/editor noise
+# Large local-only reference and nested repositories
+/docs/references/hyprdbg.2207.05676v2.pdf
+/tools/HvD/
+
+# Operating-system and editor noise
 .DS_Store
 Thumbs.db
 Desktop.ini
 *.swp
 *~
-
-# Nested repo (own git) - do not track under JohnSmith
-tools/HvD/
-
