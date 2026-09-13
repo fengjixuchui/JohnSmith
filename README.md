@@ -15,7 +15,7 @@ Windows x64 research hypervisor. Intel VT-x/EPT and AMD-V/SVM/NPT backends for i
 | Intel | VMX, EPT, VPID, VMCS control validation, CPUID policy |
 | Intel hooks | Per-vCPU dual-EPT execute hooks with observation counters |
 | AMD | SVM/NPT and masked CPUID policy |
-| Control | CPUID/shared-page hypercall transport for the companion `JohnSmithCtl` client |
+| Control | CPUID/shared-page hypercall transport for the companion [JohnSmithCtl](https://github.com/meowdiocre/johnsmithctl) client |
 | Memory | 512 GiB identity-SLAT ceiling, runtime 4 KiB permission changes |
 | State | CR0/CR3/CR4, debug state, PAT/EFER, MSR bitmaps |
 | Diagnostics | Fail-stop bugchecks, Debug-only VM-exit history |
@@ -52,3 +52,9 @@ Intel and AMD hide vendor-virtualization features from the guest. Execute hooks 
 ## License
 
 [MIT](LICENSE)
+
+## Related research
+
+- [johnsmithctl](https://github.com/meowdiocre/johnsmithctl): companion user-mode client and loader.
+- [HvD](https://github.com/meowdiocre/HvD): user-mode and kernel measurement harness.
+- [vmw](https://github.com/meowdiocre/vmw): KVM/Windows research workspace.
